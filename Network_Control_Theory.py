@@ -65,7 +65,7 @@ class QLearningAgent:
     def update(self, u, v, reward, next_node_neighbors):
         """Bellman Equation Update."""
         # Reward is negative cost (since we want to minimize cost)
-        max_future_q = np.max(self.q_lan_table[v, next_node_neighbors]) if next_node_neighbors else 0
+        max_future_q = np.max(self.q_table[v, next_node_neighbors]) if next_node_neighbors else 0
         
         # Standard Q-learning update rule
         self.q_table[u, v] += self.alpha * (reward + self.gamma * max_future_q - self.q_table[u, v])
@@ -130,10 +130,10 @@ def run_simulation(mode='static', episodes=100):
 # ==========================================
 
 print("Running Static Simulation...")
-d_static, r_static, conv_static = run_imulation(mode='static', episodes=200)
+d_static, r_static, conv_static = run_simulation(mode='static', episodes=200)
 
 print("Running Dynamic Simulation (The Graduate Twist)...")
-d_dynamic, r_dynamic, conv_dynamic = run_imulation(mode='dynamic', episodes=200)
+d_dynamic, r_dynamic, conv_dynamic = run_simulation(mode='dynamic', episodes=200)
 
 # Plotting
 fig, axes = plt.subplots(1, 2, figsize=(15, 5))
