@@ -55,19 +55,16 @@ enc_training.generate_galois_keys()
 enc_training.generate_relin_keys()
 
 # 5. Homomorphic Inference for Logistic Regression
-lr_weights = lr.coef_[0]
+lr_weights = np.array(lr.coef_[0]).tolist()  # Convert to list explicitly
 lr_bias = lr.intercept_[0]
-
-w_lr_enc = ts.ckks_vector(enc_training, lr_weights)
 
 start_he_lr = time.perf_counter()
 y_pred_lr_he = []
 
 for i in range(X_test_scaled.shape[0]):
     sample_enc = ts.ckks_vector(enc_training, X_test_scaled[i])
-    y_lin_enc = sample_enc.dot(w_lr_enc) + lr_bias
+    y_lin_enc = sample_enc.dot(lr_weights) + lr_bias
     
-    # Linear sigmoid approximation
     x_norm = y_lin_enc * 0.1
     y_sigmoid_enc = 0.5 + 0.1975 * x_norm
     
@@ -81,21 +78,46 @@ time_lr_he = time.perf_counter() - start_he_lr
 svm_weights = svm.coef_[0]
 svm_bias = svm.intercept_[0]
 
-w_svm_enc = ts.ckks_vector(enc_training, svm_weights)
-
 start_he_svm = time.perf_counter()
 y_pred_svm_he = []
+svm_dec_values = []
 
 for i in range(X_test_scaled.shape[0]):
-    sample_enc = ts.ckks_vector(enc_training, X_test_scaled[i])
-    y_lin_enc = sample_enc.dot(w_svm_enc) + svm_bias
+    sample_plain = X_test_scaled[i]
     
-    # Simple threshold at 0 (SVM decision boundary)
-    y_sigmoid_dec = y_lin_enc.decrypt()
-    y_pred_svm_he.append(1 if y_sigmoid_dec[0] > 0 else 0)
+    # Encrypt the sample
+    sample_enc = ts.ckks_vector(enc_training, sample_plain.tolist())
+    
+    # Use .dot() directly
+    y_lin_enc = sample_enc.dot(svm_weights.tolist())
+    
+    y_dot_dec = y_lin_enc.decrypt()
+    dot_val = y_dot_dec[0] if isinstance(y_dot_dec, list) else y_dot_dec
+    
+    # Add bias
+    y_lin_result = dot_val + svm_bias
+    
+    svm_dec_values.append(y_lin_result)
+    y_pred_svm_he.append(1 if y_lin_result > 0 else 0)
 
 y_pred_svm_he = np.array(y_pred_svm_he)
 time_svm_he = time.perf_counter() - start_he_svm
+
+print(f"Plaintext dot products (first 5): {[np.dot(X_test_scaled[i], svm_weights) for i in range(5)]}")
+print(f"Encrypted dot products (first 5): {[svm_dec_values[i] - svm_bias for i in range(5)]}")
+print(f"Plaintext decision (first 5): {svm.decision_function(X_test_scaled)[:5]}")
+print(f"Encrypted prediction (first 5): {svm_dec_values[:5]}")
+
+# DEBUG: Print statistics
+print(f"SVM decrypted values - Min: {min(svm_dec_values):.6f}, Max: {max(svm_dec_values):.6f}, Mean: {np.mean(svm_dec_values):.6f}")
+print(f"SVM plaintext decision values (first 5): {svm.decision_function(X_test_scaled)[:5]}")
+print(f"SVM encrypted decision values (first 5): {svm_dec_values[:5]}")
+
+# DEBUG: Compare
+print(f"Plaintext SVM bias: {svm_bias}")
+print(f"Encrypted dot products (before bias) - first 5: {svm_dec_values[:5]}")
+print(f"Encrypted values (after bias) - first 5: {svm_dec_values[:5]}")
+print(f"Plaintext decision function - first 5: {svm.decision_function(X_test_scaled)[:5]}")
 
 metrics_he = {
     'Logistic Regression': {'acc': accuracy_score(y_test, y_pred_lr_he), 'f1': f1_score(y_test, y_pred_lr_he), 'time': time_lr_he},
