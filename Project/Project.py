@@ -75,38 +75,28 @@ y_pred_lr_he = np.array(y_pred_lr_he)
 time_lr_he = time.perf_counter() - start_he_lr
 
 # 6. Homomorphic Inference for SVM
-svm_weights = svm.coef_[0]
+svm_weights = np.array(svm.coef_[0]).tolist()
 svm_bias = svm.intercept_[0]
 
 start_he_svm = time.perf_counter()
 y_pred_svm_he = []
-svm_dec_values = []
 
 for i in range(X_test_scaled.shape[0]):
-    sample_plain = X_test_scaled[i]
+    sample_enc = ts.ckks_vector(enc_training, X_test_scaled[i])
+    y_lin_enc = sample_enc.dot(svm_weights) + svm_bias
     
-    # Encrypt the sample
-    sample_enc = ts.ckks_vector(enc_training, sample_plain.tolist())
+    # Apply sigmoid transformation like LR does (to fix scale issues)
+    x_norm = y_lin_enc * 0.1
+    y_sigmoid_enc = 0.5 + 0.1975 * x_norm
     
-    # Use .dot() directly
-    y_lin_enc = sample_enc.dot(svm_weights.tolist())
-    
-    y_dot_dec = y_lin_enc.decrypt()
-    dot_val = y_dot_dec[0] if isinstance(y_dot_dec, list) else y_dot_dec
-    
-    # Add bias
-    y_lin_result = dot_val + svm_bias
-    
-    svm_dec_values.append(y_lin_result)
-    y_pred_svm_he.append(1 if y_lin_result > 0 else 0)
+    # Threshold at 0.5 (where sigmoid crosses 0)
+    y_dec = y_sigmoid_enc.decrypt()
+    y_pred_svm_he.append(1 if y_dec[0] > 0.5 else 0)
 
 y_pred_svm_he = np.array(y_pred_svm_he)
 time_svm_he = time.perf_counter() - start_he_svm
-
-print(f"Plaintext dot products (first 5): {[np.dot(X_test_scaled[i], svm_weights) for i in range(5)]}")
-print(f"Encrypted dot products (first 5): {[svm_dec_values[i] - svm_bias for i in range(5)]}")
-print(f"Plaintext decision (first 5): {svm.decision_function(X_test_scaled)[:5]}")
-print(f"Encrypted prediction (first 5): {svm_dec_values[:5]}")
+'''
+print(f"SVM Encrypted F1: {f1_score(y_test, y_pred_svm_he)}")
 
 # DEBUG: Print statistics
 print(f"SVM decrypted values - Min: {min(svm_dec_values):.6f}, Max: {max(svm_dec_values):.6f}, Mean: {np.mean(svm_dec_values):.6f}")
@@ -118,7 +108,7 @@ print(f"Plaintext SVM bias: {svm_bias}")
 print(f"Encrypted dot products (before bias) - first 5: {svm_dec_values[:5]}")
 print(f"Encrypted values (after bias) - first 5: {svm_dec_values[:5]}")
 print(f"Plaintext decision function - first 5: {svm.decision_function(X_test_scaled)[:5]}")
-
+'''
 metrics_he = {
     'Logistic Regression': {'acc': accuracy_score(y_test, y_pred_lr_he), 'f1': f1_score(y_test, y_pred_lr_he), 'time': time_lr_he},
     'SVM (Linear)': {'acc': accuracy_score(y_test, y_pred_svm_he), 'f1': f1_score(y_test, y_pred_svm_he), 'time': time_svm_he}
