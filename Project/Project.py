@@ -95,20 +95,7 @@ for i in range(X_test_scaled.shape[0]):
 
 y_pred_svm_he = np.array(y_pred_svm_he)
 time_svm_he = time.perf_counter() - start_he_svm
-'''
-print(f"SVM Encrypted F1: {f1_score(y_test, y_pred_svm_he)}")
 
-# DEBUG: Print statistics
-print(f"SVM decrypted values - Min: {min(svm_dec_values):.6f}, Max: {max(svm_dec_values):.6f}, Mean: {np.mean(svm_dec_values):.6f}")
-print(f"SVM plaintext decision values (first 5): {svm.decision_function(X_test_scaled)[:5]}")
-print(f"SVM encrypted decision values (first 5): {svm_dec_values[:5]}")
-
-# DEBUG: Compare
-print(f"Plaintext SVM bias: {svm_bias}")
-print(f"Encrypted dot products (before bias) - first 5: {svm_dec_values[:5]}")
-print(f"Encrypted values (after bias) - first 5: {svm_dec_values[:5]}")
-print(f"Plaintext decision function - first 5: {svm.decision_function(X_test_scaled)[:5]}")
-'''
 metrics_he = {
     'Logistic Regression': {'acc': accuracy_score(y_test, y_pred_lr_he), 'f1': f1_score(y_test, y_pred_lr_he), 'time': time_lr_he},
     'SVM (Linear)': {'acc': accuracy_score(y_test, y_pred_svm_he), 'f1': f1_score(y_test, y_pred_svm_he), 'time': time_svm_he}
