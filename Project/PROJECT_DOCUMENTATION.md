@@ -1,16 +1,42 @@
-# Project.py Documentation
+---
+marp: true
+theme: default
+class: list
+paginate: true
+footer: 'CS540 AI Project'
+style: |
+  section {
+    background-color: #f8f9fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+  h1, h2, h3 {
+    color: #000000;
+  }
+  h2 {
+    border-bottom: 3px solid #3498db;
+    padding-bottom: 5px;
+  }
+  code {
+    background-color: #e2e8f0;
+    color: #2bc02b;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  th {
+    background-color: #3498db;
+    color: white;
+  }
+---
 
-## Overview
-
-`Project.py` is a comprehensive machine learning pipeline that demonstrates **Homomorphic Encryption (HE)** applied to medical classification tasks. The project compares the performance of two ML models (Logistic Regression and SVM) across three execution environments:
-
-1. **Plaintext** - Standard unencrypted inference (baseline)
-2. **CKKS (8192)** - High-precision encrypted inference
-3. **CKKS (4096)** - Lower-precision encrypted inference
-
-The comparison evaluates **accuracy, F1 score, execution time, and learning curves** to assess the practical viability of HE in machine learning applications.
+# Privacy-Preserving Machine Learning
+## Exploring Homomorphic Encryption for Medical Diagnosis
+**Matthew Townsend**
+**CS540 AI Project**
 
 ---
+
 
 ## Dataset
 
@@ -22,41 +48,7 @@ The comparison evaluates **accuracy, F1 score, execution time, and learning curv
 
 ---
 
-## Dependencies
-
-```
-pandas
-numpy
-scikit-learn (LogisticRegression, SVC, train_test_split, StandardScaler, metrics)
-tenseal      # Homomorphic Encryption library
-matplotlib   # Visualization
-```
-
-Install via:
-```bash
-pip install pandas numpy scikit-learn tenseal matplotlib
-```
-
----
-
-## Architecture
-
-### Section 1: Data Loading & Preprocessing (Lines 1-24)
-
-```python
-df = pd.read_csv('Project/diabetes.csv')
-X_train, X_test = train_test_split(...)
-scaler = StandardScaler()
-X_train_scaled = scaler.fit_transform(X_train)
-```
-
-- Loads diabetes dataset and splits into 80% training, 20% testing
-- Applies StandardScaler to normalize features (mean=0, std=1)
-- **Critical**: Scaling must happen before encryption to keep values manageable
-
----
-
-### Section 2: Plaintext Model Training (Lines 26-43)
+## Plaintext Model Training 
 
 ```python
 lr = LogisticRegression(max_iter=1000, random_state=13)
@@ -72,47 +64,60 @@ svm = SVC(kernel='linear', random_state=13)
 
 ---
 
-### Section 3: CKKS Context Setup (Lines 45-72)
+## Homomorphic Encryption (HE)
 
-#### CKKS (8192) - High Precision
+Allows computation on encrypted data **without decrypting it**:
+- Plaintext: `z = a·x + b`
+- Encrypted: `Enc(z) = Enc(a)·Enc(x) + Enc(b)` ✓ Same result when decrypted
+
+### CKKS Scheme
+
+- **Approximate arithmetic** (slight rounding errors)
+- **Supports addition and multiplication** on encrypted numbers
+- **Scales by 2^p** to handle fractional arithmetic
+- **Noise grows** with each operation; eventually swallows signal
+
+---
+
+## CKKS (8192) - High Precision
 ```python
 poly_mod_degree_8192 = 8192
 coeff_mod_bit_sizes_8192 = [60, 40, 40, 60]
 enc_training_ckks_8192.global_scale = 2 ** 40
 ```
 
-- **Polynomial Degree (N=8192)**: Larger N = higher capacity and precision, but slower computation
-- **Coefficient Moduli [60, 40, 40, 60]**: Larger bit sizes provide more "room" for numbers before overflow
-- **Global Scale (2^40)**: Fractional precision in encrypted arithmetic (~1 trillion scale factor)
-
-#### CKKS (4096) - Lower Precision
+- **Polynomial Degree**: Larger N = higher capacity and precision, but slower computation
+- **Coefficient Moduli**: Larger bit sizes provide more "room" for numbers before overflow
+- **Global Scale**: Fractional precision in encrypted arithmetic (~1 trillion scale factor)
+---
+## CKKS (4096) - Lower Precision
 ```python
 poly_mod_degree_4096 = 4096
 coeff_mod_bit_sizes_4096 = [40, 21, 21, 21, 21, 40]
 enc_training_ckks_4096.global_scale = 2 ** 20
 ```
 
-- **Polynomial Degree (N=4096)**: Half the capacity of 8192, faster but noisier
+- **Polynomial Degree**: Half the capacity of 8192, faster but noisier
 - **Smaller coefficient moduli**: Less precision available
-- **Lower scale (2^20)**: Reduced fractional precision (~1 million scale factor)
+- **Lower scale**: Reduced fractional precision (~1 million scale factor)
 
 **Purpose**: This creates an intentional "precision gap" to demonstrate how HE performance degrades with reduced security margins.
 
 ---
 
-### Section 4: Threshold Calibration (Lines 74-93)
+## Threshold Calibration 
 
 ```python
 threshold_lr_ckks = np.mean(y_lin_enc_train_lr)
 ```
 
 - Computes the encrypted predictions on 50 training samples
-- Takes the **mean** as the decision boundary
-- **Why?** In HE, decryption can introduce minor noise. We calibrate the threshold to the encrypted domain to ensure fair comparison.
+- Takes the mean as the decision boundary
+- In HE, decryption can introduce minor noise. We calibrate the threshold to the encrypted domain to ensure fair comparison.
 
 ---
 
-### Section 5 & 6: Homomorphic Inference (Lines 95-165)
+##  Homomorphic Inference 
 
 For each model (LR/SVM) and context (8192/4096):
 
@@ -126,28 +131,11 @@ y_pred = 1 if y_lin_dec[0] > threshold else 0     # Thresholded classification
 - **ts.ckks_vector()**: Encrypts plaintext feature vector
 - **.dot()**: Computes encrypted dot product (weights · features)
 - **decrypt()**: Returns ciphertext to plaintext (only private key can do this)
-- All operations are **mathematically equivalent** to plaintext computation, but with added noise
+- All operations are mathematically equivalent to plaintext computation, but with added noise
 
 ---
 
-### Section 7: Results Storage & Display (Lines 167-223)
-
-Stores metrics in nested dictionaries:
-```python
-metrics_he = {
-    'CKKS (8192)': {
-        'Logistic Regression': {'acc': ..., 'f1': ..., 'time': ...},
-        'SVM (Linear)': {...}
-    },
-    'CKKS (4096)': {...}
-}
-```
-
-Displays a comparison table showing all 6 model/context combinations.
-
----
-
-### Section 8: Learning Curves (Lines 228-369)
+## Learning Curves 
 
 Iterates over 5 training set sizes (20%, 40%, 60%, 80%, 100%):
 
@@ -159,72 +147,23 @@ Iterates over 5 training set sizes (20%, 40%, 60%, 80%, 100%):
 **Key Insight**: The learning curves reveal whether HE models can improve with more training data or if they're fundamentally limited by encryption noise.
 
 ---
+## 
 
-### Section 9: Visualization (Lines 371-429)
+![Alt text](Fig_1.png)
 
-Generates a 2×2 subplot figure:
+---
+##
 
-| Plot | Description |
-|------|-------------|
-| **[0,0]** | Logistic Regression learning curve across all contexts |
-| **[0,1]** | SVM learning curve across all contexts |
-| **[1,0]** | F1 score bar chart (full training data) |
-| **[1,1]** | Inference timing comparison (log scale) |
+![Alt text](Fig_2.png)
 
 ---
 
-## Key Concepts
-
-### Homomorphic Encryption (HE)
-
-Allows computation on encrypted data **without decrypting it**:
-- Plaintext: `z = a·x + b`
-- Encrypted: `Enc(z) = Enc(a)·Enc(x) + Enc(b)` ✓ Same result when decrypted
-
-### CKKS Scheme
-
-- **Approximate arithmetic** (slight rounding errors)
-- **Supports addition and multiplication** on encrypted numbers
-- **Scales by 2^p** to handle fractional arithmetic
-- **Noise grows** with each operation; eventually swallows signal
-
-### Decision Boundary in HE
-
-In plaintext: `decision = (w·x + b) > 0`  
-In HE: Same computation, but `(w·x + b)` contains noise that can flip predictions near the decision boundary.
-
----
-
-## Running the Code
-
-```bash
-cd /Users/m01010100/Documents/CS541_AI/Project
-python Project.py
-```
-
-**Expected Runtime**: 10-15 minutes (HE operations are computationally expensive)
-
-**Output**:
-1. Console table comparing all models
-2. Matplotlib figure with 4 subplots
-3. Progress messages showing learning curve evaluation
-
----
-
-## Interpreting Results
-
-### Performance Gap Analysis
+## Performance Gap Analysis
 
 Plaintext vs. CKKS performance gaps indicate:
 - **8192 > 4096**: Higher polynomial degree reduces noise
 - **Small gap (<5%)**: HE viable for this task
 - **Large gap (>20%)**: Noise floor dominates; dataset/model not suitable for HE
-
-### Learning Curves
-
-- **Plaintext curves**: Should monotonically increase (more data = better)
-- **HE curves (flat)**: Noise prevents improvement; limited by precision, not data
-- **HE curves (rising)**: HE can still learn; precision sufficient to capture signal
 
 ### Timing Comparison
 
@@ -234,58 +173,14 @@ Plaintext vs. CKKS performance gaps indicate:
 
 ---
 
-## Configuration Parameters
+## Conclusion
 
-### To Improve HE Accuracy
+This project demonstrates the **fundamental tradeoff in HE**:
+- **Security**: Data stays encrypted; server never sees plaintext
+- **Accuracy**: Noise from encryption reduces model performance
+- **Speed**: Encrypted operations 1000x+ slower than plaintext
 
-1. **Increase polynomial degree**:
-   ```python
-   poly_mod_degree_8192 = 16384  # Double capacity
-   coeff_mod_bit_sizes_8192 = [60, 40, 40, 40, 40, 40, 40, 60]
-   ```
-
-2. **Increase global scale**:
-   ```python
-   enc_training_ckks_8192.global_scale = 2 ** 50  # More precision
-   ```
-
-3. **Improve dataset**:
-   - Use MinMaxScaler instead of StandardScaler
-   - Apply PCA to reduce dimensionality
-   - Choose datasets with larger class margins
-
-### To Speed Up Inference
-
-1. **Reduce polynomial degree** (sacrifices precision)
-2. **Use batching** (encrypt multiple samples at once)
-3. **Implement approximate HE** (lower security for speed)
-
----
-
-## Common Issues & Solutions
-
-| Issue | Cause | Solution |
-|-------|-------|----------|
-| Terrible HE accuracy (50%) | Scale too small; noise dominates | Increase `global_scale` |
-| CKKS (4096) flat line | Precision insufficient | Use higher polynomial degree |
-| Out of memory | Large ciphertext | Reduce `poly_mod_degree` |
-| Negative accuracy | Threshold miscalibration | Re-run calibration loop |
-| Extreme slowdown | Too many multiplications | Reduce feature count (PCA) |
-
----
-
-## Mathematical Details
-
-### CKKS Encoding
-
-Plaintext value `x` → Encoded as: `m = round(x × 2^p)` where `p = log2(scale)`
-
-### Encryption Noise
-
-After `k` multiplications:
-- Noise magnitude ≈ $N × 2^k$ (N = context-dependent constant)
-- Signal magnitude ≈ value being encrypted
-- Signal lost when: Noise > Signal
+HE is ideal for **privacy-critical, latency-tolerant** applications (e.g., outsourced analysis of sensitive medical data). For real-time inference, traditional encryption (TLS) + secure enclaves remain superior.
 
 ---
 
@@ -295,13 +190,3 @@ After `k` multiplications:
 - **CKKS Scheme**: Cheon et al. (2017) "Homomorphic Encryption for Arithmetic of Approximate Numbers"
 - **Diabetes Dataset**: UCI ML Repository
 
----
-
-## Author Notes
-
-This project demonstrates the **fundamental tradeoff in HE**:
-- **Security**: Data stays encrypted; server never sees plaintext
-- **Accuracy**: Noise from encryption reduces model performance
-- **Speed**: Encrypted operations 1000x+ slower than plaintext
-
-HE is ideal for **privacy-critical, latency-tolerant** applications (e.g., outsourced analysis of sensitive medical data). For real-time inference, traditional encryption (TLS) + secure enclaves remain superior.
